@@ -5,6 +5,7 @@ import {
   PaperClipOutlined,
   PictureOutlined,
   LoadingOutlined,
+  PauseCircleOutlined,
 } from '@ant-design/icons';
 
 const { TextArea } = Input;
@@ -12,9 +13,10 @@ const { TextArea } = Input;
 interface InputAreaProps {
   onSend: (message: string) => void;
   loading: boolean;
+  onStop?: () => void;
 }
 
-export default function InputArea({ onSend, loading }: InputAreaProps) {
+export default function InputArea({ onSend, loading, onStop }: InputAreaProps) {
   const [input, setInput] = useState('');
   const textareaRef = useRef<any>(null);
 
@@ -115,20 +117,35 @@ export default function InputArea({ onSend, loading }: InputAreaProps) {
               </Upload>
             </Space>
 
-            {/* 发送按钮 */}
-            <Button
-              type="primary"
-              icon={loading ? <LoadingOutlined /> : <SendOutlined />}
-              onClick={handleSend}
-              disabled={!input.trim() || loading}
-              className="rounded-lg"
-              style={{
-                background: input.trim() && !loading ? '#10a37f' : '#d9d9d9',
-                borderColor: input.trim() && !loading ? '#10a37f' : '#d9d9d9',
-              }}
-            >
-              {loading ? '发送中' : '发送'}
-            </Button>
+            {/* 发送/停止按钮 */}
+            {loading && onStop ? (
+              <Button
+                type="primary"
+                icon={<PauseCircleOutlined />}
+                onClick={onStop}
+                className="rounded-lg"
+                style={{
+                  background: '#ef4444',
+                  borderColor: '#ef4444',
+                }}
+              >
+                停止生成
+              </Button>
+            ) : (
+              <Button
+                type="primary"
+                icon={<SendOutlined />}
+                onClick={handleSend}
+                disabled={!input.trim()}
+                className="rounded-lg"
+                style={{
+                  background: input.trim() ? '#10a37f' : '#d9d9d9',
+                  borderColor: input.trim() ? '#10a37f' : '#d9d9d9',
+                }}
+              >
+                发送
+              </Button>
+            )}
           </div>
         </div>
 

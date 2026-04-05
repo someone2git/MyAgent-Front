@@ -15,15 +15,24 @@ export const chatApi = {
   async sendMessageStream(
     message: string,
     conversationId: string,
+    externalSignal: AbortSignal,
     onChunk: (chunk: string) => void,
     onComplete: () => void,
     onError: (error: Error) => void
   ): Promise<void> {
     // 创建 AbortController 用于超时控制 (10秒)
     const controller = new AbortController();
+    let isUserCancelled = false; // 标记是否用户主动取消
     let timeoutId = setTimeout(() => {
       controller.abort();
     }, 10000); // 10秒超时
+
+    // 监听外部取消信号
+    externalSignal.addEventListener('abort', () => {
+      isUserCancelled = true; // 标记为用户主动取消
+      clearTimeout(timeoutId);
+      controller.abort();
+    });
 
     try {
       // 构建 URL 查询参数
@@ -85,9 +94,16 @@ export const chatApi = {
       }
     } catch (error) {
       clearTimeout(timeoutId);
-      // 判断是否为超时错误
+      // 判断是否为 AbortError
       if (error instanceof Error && error.name === 'AbortError') {
-        onError(new Error('系统忙，稍后再试'));
+        // 区分用户主动取消和超时
+        if (isUserCancelled) {
+          // 用户主动取消，静默处理
+          onComplete();
+        } else {
+          // 超时导致的取消
+          onError(new Error('系统忙，稍后再试'));
+        }
       } else {
         onError(error instanceof Error ? error : new Error(String(error)));
       }
@@ -128,6 +144,14 @@ export const chatApi = {
   // 未来扩展：PPT 生成功能
   async generatePpt(topic: string, outline?: string[]) {
     const response = await api.post('/ppt/generate', { topic, outline });
+    return response.data;
+  },
+
+  // 停止生成
+  async stopGeneration(conversationId: string): Promise<{ success: boolean; message: string }> {
+    const response: AxiosResponse<{ success: boolean; message: string }> = await api.get('/stop', {
+      params: { conversationId },
+    });
     return response.data;
   },
 };

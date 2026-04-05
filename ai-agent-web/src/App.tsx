@@ -9,16 +9,24 @@ import './index.css';
 
 const { Content } = Layout;
 
+// 生成随机字符串作为 conversationId
+function generateConversationId(): string {
+  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+}
+
+// 初始对话ID（随机生成）
+const initialConversationId = generateConversationId();
+
 function App() {
   const [conversations, setConversations] = useState<Conversation[]>([
     {
-      id: '1',
+      id: initialConversationId,
       title: '欢迎使用 AI Agent',
       lastMessage: '你好，我是你的 AI 助手，有什么可以帮助你的吗？',
       timestamp: Date.now(),
     },
   ]);
-  const [currentConversationId, setCurrentConversationId] = useState<string>('1');
+  const [currentConversationId, setCurrentConversationId] = useState<string>(initialConversationId);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -30,9 +38,12 @@ function App() {
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // 用于中止当前请求的 AbortController
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   // 存储所有对话的消息历史 (conversationId -> Message[])
   const messagesMapRef = useRef<Map<string, Message[]>>(new Map([
-    ['1', [
+    [initialConversationId, [
       {
         id: '1',
         role: 'assistant',
@@ -64,7 +75,7 @@ function App() {
 
   // 创建新对话
   const createNewConversation = () => {
-    const newId = Date.now().toString();
+    const newId = generateConversationId();
     const newConversation: Conversation = {
       id: newId,
       title: '新对话',
@@ -144,10 +155,14 @@ function App() {
     // 使用 API 服务发送流式消息
     let accumulatedContent = '';
 
+    // 创建新的 AbortController
+    abortControllerRef.current = new AbortController();
+
     try {
       await chatApi.sendMessageStream(
       content,
       currentConversationId,
+      abortControllerRef.current.signal,
       // onChunk
       (chunk: string) => {
         accumulatedContent += chunk;
@@ -162,12 +177,19 @@ function App() {
       // onComplete
       () => {
         setLoading(false);
+        abortControllerRef.current = null;
         // 保存最终消息到存储
         messagesMapRef.current.set(currentConversationId, messages);
       },
       // onError
       (error: Error) => {
         console.error('发送消息失败:', error);
+        // 如果是用户主动取消，不显示错误
+        if (error.name === 'AbortError') {
+          setLoading(false);
+          abortControllerRef.current = null;
+          return;
+        }
         const errorMsg = error.message?.includes('系统忙')
           ? '系统忙，稍后再试'
           : error.message || '抱歉，发生了错误，请稍后重试。';
@@ -181,6 +203,7 @@ function App() {
         );
         // 确保关闭loading状态
         setLoading(false);
+        abortControllerRef.current = null;
       }
     );
     } catch (error) {
@@ -195,7 +218,31 @@ function App() {
         )
       );
       setLoading(false);
+      abortControllerRef.current = null;
     }
+  };
+
+  // 停止生成
+  const handleStopGeneration = async () => {
+    if (!abortControllerRef.current) return;
+
+    // 1. 中止前端的 fetch 请求
+    abortControllerRef.current.abort();
+    abortControllerRef.current = null;
+
+    // 2. 调用后端停止接口
+    try {
+      const result = await chatApi.stopGeneration(currentConversationId);
+      if (result.success) {
+        antMessage.success(result.message);
+      } else {
+        antMessage.info(result.message);
+      }
+    } catch (error) {
+      console.error('停止生成失败:', error);
+    }
+
+    setLoading(false);
   };
 
   return (
@@ -214,7 +261,7 @@ function App() {
             loading={loading}
             messagesEndRef={messagesEndRef}
           />
-          <InputArea onSend={sendMessage} loading={loading} />
+          <InputArea onSend={sendMessage} loading={loading} onStop={handleStopGeneration} />
         </Content>
       </Layout>
     </Layout>

@@ -13,6 +13,40 @@ import remarkGfm from 'remark-gfm';
 
 const { Text } = Typography;
 
+// 渐变波动动画组件
+function GeneratingIndicator() {
+  return (
+    <span className="inline-flex items-center ml-1">
+      <span className="generating-dot" style={{ animationDelay: '0ms' }}>.</span>
+      <span className="generating-dot" style={{ animationDelay: '200ms' }}>.</span>
+      <span className="generating-dot" style={{ animationDelay: '400ms' }}>.</span>
+      <span className="generating-dot" style={{ animationDelay: '600ms' }}>.</span>
+      <span className="generating-dot" style={{ animationDelay: '800ms' }}>.</span>
+      <span className="generating-dot" style={{ animationDelay: '1000ms' }}>.</span>
+      <style>{`
+        .generating-dot {
+          display: inline-block;
+          font-size: 20px;
+          font-weight: bold;
+          line-height: 1;
+          animation: wave 1.2s ease-in-out infinite;
+          color: #9ca3af;
+        }
+        @keyframes wave {
+          0%, 100% {
+            opacity: 0.2;
+            transform: translateY(0);
+          }
+          50% {
+            opacity: 1;
+            transform: translateY(-3px);
+          }
+        }
+      `}</style>
+    </span>
+  );
+}
+
 interface ChatAreaProps {
   messages: Message[];
   loading: boolean;
@@ -105,6 +139,10 @@ export default function ChatArea({ messages, loading, messagesEndRef }: ChatArea
                   </div>
                   <div className="markdown-body text-gray-700 leading-relaxed">
                     {renderMessageContent(message.content)}
+                    {/* 生成中显示波动动画 */}
+                    {loading && index === messages.length - 1 && message.role === 'assistant' && (
+                      <GeneratingIndicator />
+                    )}
                   </div>
 
                   {/* 操作按钮 */}
